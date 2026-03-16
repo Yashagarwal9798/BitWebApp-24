@@ -560,7 +560,7 @@ const selectSummerStudents = asyncHandler(async (req, res) => {
       await student.save({ session });
       // console.log("check2!");
       const internRecord = await Internship.findOneAndUpdate(
-        { student: student._id, verified: false, mentor: { $exists: false } },
+        { student: student._id, mentor: { $exists: false } },
         {
           type: "research",
           location: "inside_bit",

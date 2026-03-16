@@ -64,7 +64,6 @@ const addInternship = asyncHandler(async (req, res) => {
     startDate,
     endDate,
     doc: docUrl,
-    verified: false,
   });
 
   if (!createdInternship) {
@@ -132,8 +131,7 @@ const getAllInternshipData = asyncHandler(async (req, res) => {
       );
     }
   }
-
-  const response = await Internship.find({ verified: false }).populate({
+  const response = await Internship.find().populate({
     path: "student",
     select: "batch fullName rollNumber email section branch mobileNumber",
     match: { batch: batchNumber },
@@ -228,8 +226,7 @@ const getAllVerifiedInternshipData = asyncHandler(async (req, res) => {
 const getInternshipDataforStudent = asyncHandler(async (req, res) => {
   const { student_id } = req.body;
   const response = await Internship.find(
-    { student: student_id },
-    { verfied: true }
+    { student: student_id }
   )
     .populate("student")
     .populate("company");
@@ -241,7 +238,6 @@ const getInternshipDataforStudent = asyncHandler(async (req, res) => {
 const verifyIntern = asyncHandler(async (req, res) => {
   const { internid } = req.body;
   const intern = await Internship.findById({ _id: internid });
-  intern.verified = true;
   await intern.save();
   res.status(200).json(new ApiResponse(200, "Verified Successfully"));
 });
