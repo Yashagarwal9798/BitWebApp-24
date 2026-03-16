@@ -138,6 +138,16 @@ const acceptReq = asyncHandler(async (req, res) => {
   group.members.push(user?._id);
   user.group = group._id;
   user.groupReq = [];
+
+  if (group.summerAppliedProfs && group.summerAppliedProfs.length > 0) {
+    let internshipData = {
+      student: user._id,
+      type: group.typeOfSummer,
+      location: group.location || "inside_bit",
+    };
+    await Internship.create(internshipData);
+  }
+
   await user.save();
   await group.save({ validateBeforeSave: false });
   return res.status(200).json(new ApiResponse(200, "Joined successfully"));
@@ -179,6 +189,11 @@ const removeMember = asyncHandler(async (req, res) => {
   group.members.pull(user?._id);
   user.group = null;
   await group.save({ validateBeforeSave: false });
+
+  if (!group.summerAllocatedProf) {
+    await Internship.deleteOne({ student: user._id, mentor: { $exists: false } });
+  }
+
   if (group?.leader.equals(user?._id)) {
     if (group.members.length > 0) {
       group.leader = group.members[0];
@@ -194,18 +209,7 @@ const removeMember = asyncHandler(async (req, res) => {
           }
         }
       }
-      
-      // Also clean up the pending internship record for the leader when group is deleted
-      if (!group.summerAllocatedProf) {
-         await Internship.deleteOne({ student: group.leader, mentor: { $exists: false } });
-      }
-
       await group.deleteOne();
-    }
-  } else {
-    // If the member is not the leader and the group hasn't been allocated
-    if (!group.summerAllocatedProf) {
-      await Internship.deleteOne({ student: user._id, mentor: { $exists: false } });
     }
   }
   await user.save();
