@@ -199,7 +199,7 @@ const removeMember = asyncHandler(async (req, res) => {
   } else {
     // If the member is not the leader and the group hasn't been allocated
     if (!group.summerAllocatedProf) {
-      await Internship.deleteOne({ student: user._id, verified: false, mentor: { $exists: false } });
+      await Internship.deleteOne({ student: user._id, mentor: { $exists: false } });
     }
   }
   await user.save();
