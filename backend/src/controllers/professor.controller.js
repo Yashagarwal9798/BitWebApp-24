@@ -732,6 +732,7 @@ const acceptGroup = asyncHandler(async (req, res) => {
     }
     group.summerAllocatedProf = profId;
     group.summerAppliedProfs = [];
+    if (!group.location) group.location = "inside_bit";
     await group.save({ session });
     prof.currentCount.summer_training += numOfMem;
     prof.appliedGroups.summer_training.pull(group._id);
