@@ -740,7 +740,7 @@ const acceptGroup = asyncHandler(async (req, res) => {
     await prof.save({ session });
     for (const studentId of group.members) {
       await Internship.findOneAndUpdate(
-        { student: studentId, verified: false, mentor: { $exists: false } },
+        { student: studentId, mentor: { $exists: false } },
         {
           type: group.typeOfSummer,
           location: group.location || (group.typeOfSummer === "research" ? "inside_bit" : "outside_bit"),
