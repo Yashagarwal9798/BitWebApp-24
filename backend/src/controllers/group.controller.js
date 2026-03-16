@@ -6,6 +6,7 @@ import { Group } from "../models/group.model.js";
 import { customAlphabet, nanoid } from "nanoid";
 import { Professor } from "../models/professor.model.js";
 import { Company } from "../models/company.model.js";
+import { Internship } from "../models/internship.model.js";
 
 const createGroup = asyncHandler(async (req, res) => {
   const leader = req?.user?._id;
@@ -183,7 +184,22 @@ const removeMember = asyncHandler(async (req, res) => {
       group.leader = group.members[0];
       await group.save({ validateBeforeSave: false });
     } else {
+      // Clean up professors' queues to prevent ghost applications
+      if (group.summerAppliedProfs && group.summerAppliedProfs.length > 0) {
+        for (const profId of group.summerAppliedProfs) {
+          const prof = await Professor.findById(profId);
+          if (prof) {
+            prof.appliedGroups.summer_training.pull(group._id);
+            await prof.save();
+          }
+        }
+      }
       await group.deleteOne();
+    }
+  } else {
+    // If the member is not the leader and the group hasn't been allocated
+    if (!group.summerAllocatedProf) {
+      await Internship.deleteOne({ student: user._id, verified: false, mentor: { $exists: false } });
     }
   }
   await user.save();
@@ -313,6 +329,24 @@ const applyToFaculty = asyncHandler(async (req, res) => {
     group.preferenceLastMovedAt = Date.now();
     faculty.appliedGroups.summer_training.push(group._id);
     await faculty.save();
+
+    // Create pending internship records for all members
+    let internships;
+    if (group.typeOfSummer === "research") {
+      internships = group.members.map((studentId) => ({
+        student: studentId,
+        type: group.typeOfSummer,
+        location: group.location || "inside_bit",
+      }));
+    } else {
+      internships = group.members.map((studentId) => ({
+        student: studentId,
+        type: group.typeOfSummer,
+        location: group.location || "outside_bit",
+        company: group.org,
+      }));
+    }
+    await Internship.insertMany(internships);
   }
 
   await group.save({ validateBeforeSave: false });

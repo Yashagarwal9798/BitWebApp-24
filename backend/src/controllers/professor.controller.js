@@ -466,6 +466,15 @@ const applyToSummer = asyncHandler(async (req, res) => {
 
   await user.save();
 
+  if (appliedProfIds.length > 0 && user.summerAppliedProfs.length === appliedProfIds.length) {
+    // This is their first time applying, create a pending internship record
+    await Internship.create({
+      student: user._id,
+      type: "research",
+      location: "inside_bit",
+    });
+  }
+
   const responseMessage = {
     appliedProfessors: appliedProfIds,
     errors,
@@ -550,18 +559,16 @@ const selectSummerStudents = asyncHandler(async (req, res) => {
       );
       await student.save({ session });
       // console.log("check2!");
-      const internRecord = await Internship.create(
-        [
-          {
-            student: student._id,
-            type: "research",
-            location: "inside_bit",
-            mentor: profId,
-            startDate: new Date(),
-            endDate: new Date(),
-          },
-        ],
-        { session }
+      const internRecord = await Internship.findOneAndUpdate(
+        { student: student._id, verified: false, mentor: { $exists: false } },
+        {
+          type: "research",
+          location: "inside_bit",
+          mentor: profId,
+          startDate: new Date(),
+          endDate: new Date(),
+        },
+        { upsert: true, new: true, session }
       );
       // console.log("check3!");
       if (!internRecord) {
@@ -605,7 +612,7 @@ const incrementLimit = asyncHandler(async (req, res) => {
   if (!professor) {
     throw new ApiError(404, "Professor not found!");
   }
-  if (!limit || !type) {
+  if (limit === undefined || limit === null || !type) {
     throw new ApiError(400, "Limit and field are required!");
   }
   if (type == "summer_training") {
@@ -730,33 +737,18 @@ const acceptGroup = asyncHandler(async (req, res) => {
     prof.appliedGroups.summer_training.pull(group._id);
     prof.students.summer_training.push(group._id);
     await prof.save({ session });
-    let internships;
-    if (group.typeOfSummer === "research") {
-      internships = group.members.map((studentId) => ({
-        student: studentId,
-        type: group.typeOfSummer,
-        location: group.location || "inside_bit", // backwards compatibility fallback
-        mentor: profId,
-      }));
-    } else {
-      internships = group.members.map((studentId) => ({
-        student: studentId,
-        type: group.typeOfSummer,
-        location: group.location || "outside_bit", // backwards compatibility fallback
-        company: group.org,
-        mentor: profId,
-      }));
+    for (const studentId of group.members) {
+      await Internship.findOneAndUpdate(
+        { student: studentId, verified: false, mentor: { $exists: false } },
+        {
+          type: group.typeOfSummer,
+          location: group.location || (group.typeOfSummer === "research" ? "inside_bit" : "outside_bit"),
+          company: group.typeOfSummer === "industrial" ? group.org : undefined,
+          mentor: profId,
+        },
+        { upsert: true, new: true, session }
+      );
     }
-
-    // const internships = group.members.map((studentId) => ({
-    //   student: studentId,
-    //   type: group.typeOfSummer,
-    //   location:
-    //     group.typeOfSummer === "research" ? "inside_bit" : "outside_bit",
-    //   company: group.typeOfSummer === "industrial" ? group.org : null,
-    //   mentor: profId,
-    // }));
-    await Internship.insertMany(internships, { session });
     await session.commitTransaction();
     session.endSession();
     return res.status(200).json(new ApiResponse(200, "Group accepted"));
@@ -1207,7 +1199,7 @@ const denyMinorGroup = asyncHandler(async (req, res) => {
   prof.appliedGroups.minor_project.pull(_id);
   group.deniedProf.push(profId);
   group.preferenceLastMovedAt = Date.now();
-  await group.save();
+  await group.save({ validateBeforeSave: false });
   await prof.save();
   if (group.minorAppliedProfs.length > 0) {
     const profToApply = group.minorAppliedProfs[0];
@@ -1551,7 +1543,7 @@ const denyMajorGroup = asyncHandler(async (req, res) => {
   prof.appliedGroups.major_project.pull(_id);
   group.deniedProf.push(profId);
   group.preferenceLastMovedAt = Date.now();
-  await group.save();
+  await group.save({ validateBeforeSave: false });
   await prof.save();
   if (group.majorAppliedProfs.length > 0) {
     const profToApply = group.majorAppliedProfs[0];

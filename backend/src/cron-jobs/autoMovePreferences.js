@@ -52,7 +52,7 @@ const preprocessGroups = async () => {
 
           group.preferenceLastMovedAt = new Date();
         }
-        await group.save();
+        await group.save({ validateBeforeSave: false });
 
         if (
           originalFirstPref &&
@@ -118,7 +118,7 @@ const moveApplications = async () => {
         }
       }
       group.preferenceLastMovedAt = new Date();
-      await group.save();
+      await group.save({ validateBeforeSave: false });
       console.log(`Group ${group.groupId} saved successfully`);
     }
     console.log("Pending applications moved successfully!");
