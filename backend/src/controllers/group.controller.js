@@ -194,6 +194,12 @@ const removeMember = asyncHandler(async (req, res) => {
           }
         }
       }
+      
+      // Also clean up the pending internship record for the leader when group is deleted
+      if (!group.summerAllocatedProf) {
+         await Internship.deleteOne({ student: group.leader, mentor: { $exists: false } });
+      }
+
       await group.deleteOne();
     }
   } else {
