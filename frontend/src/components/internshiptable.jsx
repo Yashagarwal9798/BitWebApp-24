@@ -116,7 +116,7 @@ export default function InternshipTable() {
       const mentor =
         record.mentor?.idNumber && record.mentor?.fullName
           ? `${record.mentor.idNumber}: ${record.mentor.fullName}`
-          : "N/A";
+          : "Mentor Not Alloted";
 
       maxIndexLength = Math.max(maxIndexLength, (index + 1).toString().length);
       maxRollNumberLength = Math.max(
@@ -197,7 +197,7 @@ export default function InternshipTable() {
 
     // Add data rows matching the frontend table
     filteredData.forEach((record, index) => {
-      const mentor = record.mentor?.fullName || "N/A";
+      const mentor = record.mentor?.fullName || "Mentor Not Alloted";
 
       const row = worksheet.addRow({
         index: index + 1,
@@ -383,7 +383,7 @@ export default function InternshipTable() {
               <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
                 {record?.mentor
                   ? record?.mentor?.fullName
-                  : "N/A"}
+                  : "Mentor Not Alloted"}
               </td>
               <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
                 {record?.group?.projectTitle || "N/A"}

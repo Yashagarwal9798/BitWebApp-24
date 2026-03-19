@@ -6,11 +6,12 @@ import { Group } from "../models/group.model.js";
 import { customAlphabet, nanoid } from "nanoid";
 import { Professor } from "../models/professor.model.js";
 import { Company } from "../models/company.model.js";
+import { Internship } from "../models/internship.model.js";
 
 const createGroup = asyncHandler(async (req, res) => {
   const leader = req?.user?._id;
-  const { typeofSummer, org } = req.body;
-  console.log(typeofSummer, org);
+  const { typeofSummer, org, location } = req.body;
+  console.log(typeofSummer, org, location);
   const nanoid = customAlphabet("ABCDEFGHJKLMNPQRSTUVWXYZ23456789", 6);
   const members = [leader];
   const user = await User.findById(leader);
@@ -29,6 +30,9 @@ const createGroup = asyncHandler(async (req, res) => {
       "Organisation Name is required for industrial summer internship"
     );
   }
+  if (!location || (location !== "inside_bit" && location !== "outside_bit")) {
+    throw new ApiError(400, "Valid location (inside_bit or outside_bit) is required");
+  }
   let newGroup;
   if (org) {
     const company = await Company.findById(org);
@@ -43,6 +47,7 @@ const createGroup = asyncHandler(async (req, res) => {
       type: "summer",
       typeOfSummer: typeofSummer,
       org,
+      location,
     });
     user.group = newGroup._id;
     await user.save();
@@ -53,6 +58,7 @@ const createGroup = asyncHandler(async (req, res) => {
       members,
       type: "summer",
       typeOfSummer: typeofSummer,
+      location,
     });
     user.group = newGroup._id;
     await user.save();
@@ -75,6 +81,10 @@ const addMember = asyncHandler(async (req, res) => {
   if (group.typeOfSummer === "industrial") {
     console.log("Cannot add member to industrial group");
     throw new ApiError(409, "Cannot add member to industrial group");
+  }
+  if (group.typeOfSummer === "research" && group.location === "outside_bit") {
+    console.log("Cannot add member to outside_bit research group");
+    throw new ApiError(409, "Outside BIT research groups can only have 1 member");
   }
 
   if (!group.leader.equals(loggedIn)) {
@@ -107,6 +117,16 @@ const acceptReq = asyncHandler(async (req, res) => {
     console.log("group not found");
     throw new ApiError(404, "Group not found");
   }
+  if (group.typeOfSummer === "industrial") {
+     throw new ApiError(409, "Cannot join industrial group");
+  }
+  if (group.typeOfSummer === "research" && group.location === "outside_bit") {
+     throw new ApiError(409, "Outside BIT research groups can only have 1 member");
+  }
+  if (!group) {
+    console.log("group not found");
+    throw new ApiError(404, "Group not found");
+  }
   if (group.summerAllocatedProf) {
     console.log("Cannot join as group has a faculty assigned.");
     throw new ApiError(409, "Cannot join as group has a faculty assigned.");
@@ -118,8 +138,18 @@ const acceptReq = asyncHandler(async (req, res) => {
   group.members.push(user?._id);
   user.group = group._id;
   user.groupReq = [];
+
+  if (group.summerAppliedProfs && group.summerAppliedProfs.length > 0) {
+    let internshipData = {
+      student: user._id,
+      type: group.typeOfSummer,
+      location: group.location || "inside_bit",
+    };
+    await Internship.create(internshipData);
+  }
+
   await user.save();
-  await group.save();
+  await group.save({ validateBeforeSave: false });
   return res.status(200).json(new ApiResponse(200, "Joined successfully"));
 });
 
@@ -158,12 +188,27 @@ const removeMember = asyncHandler(async (req, res) => {
   }
   group.members.pull(user?._id);
   user.group = null;
-  await group.save();
+  await group.save({ validateBeforeSave: false });
+
+  if (!group.summerAllocatedProf) {
+    await Internship.deleteOne({ student: user._id, mentor: { $exists: false } });
+  }
+
   if (group?.leader.equals(user?._id)) {
     if (group.members.length > 0) {
       group.leader = group.members[0];
-      await group.save();
+      await group.save({ validateBeforeSave: false });
     } else {
+      // Clean up professors' queues to prevent ghost applications
+      if (group.summerAppliedProfs && group.summerAppliedProfs.length > 0) {
+        for (const profId of group.summerAppliedProfs) {
+          const prof = await Professor.findById(profId);
+          if (prof) {
+            prof.appliedGroups.summer_training.pull(group._id);
+            await prof.save();
+          }
+        }
+      }
       await group.deleteOne();
     }
   }
@@ -294,9 +339,27 @@ const applyToFaculty = asyncHandler(async (req, res) => {
     group.preferenceLastMovedAt = Date.now();
     faculty.appliedGroups.summer_training.push(group._id);
     await faculty.save();
+
+    // Create pending internship records for all members
+    let internships;
+    if (group.typeOfSummer === "research") {
+      internships = group.members.map((studentId) => ({
+        student: studentId,
+        type: group.typeOfSummer,
+        location: group.location || "inside_bit",
+      }));
+    } else {
+      internships = group.members.map((studentId) => ({
+        student: studentId,
+        type: group.typeOfSummer,
+        location: group.location || "outside_bit",
+        company: group.org,
+      }));
+    }
+    await Internship.insertMany(internships);
   }
 
-  await group.save();
+  await group.save({ validateBeforeSave: false });
 
   return res
     .status(200)
@@ -371,7 +434,7 @@ const addDiscussion = asyncHandler(async (req, res) => {
     throw new ApiError(409, "Only Leader can add discussion");
   }
   group.discussion.push({ description });
-  await group.save();
+  await group.save({ validateBeforeSave: false });
   return res
     .status(200)
     .json(new ApiResponse(200, group, "Discussion added successfully"));
@@ -399,7 +462,7 @@ const addRemarkAbsent = asyncHandler(async (req, res) => {
     date: new Date(),
   });
 
-  await group.save();
+  await group.save({ validateBeforeSave: false });
 
   return res
     .status(200)
