@@ -536,8 +536,11 @@ const AcceptMajorProject = () => {
                         <input
                           type="checkbox"
                           checked={selectedAcceptedGroups.includes(group._id)}
-                          onChange={() => handleSelectAcceptedGroup(group._id)}
-                          className="h-5 w-5 text-blue-600 rounded focus:ring-blue-500"
+                          onChange={(e) => {
+                            e.stopPropagation();
+                            handleSelectAcceptedGroup(group._id);
+                          }}
+                          className="h-5 w-5 text-blue-600 rounded focus:ring-blue-500 cursor-pointer"
                         />
                       )}
                       <div>

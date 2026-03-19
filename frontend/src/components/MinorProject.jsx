@@ -147,13 +147,19 @@ const MinorProject = () => {
     }
 
     // Apply availability filter
-    if (filterOption !== "all") {
+    if (filterOption === "available") {
       filtered = filtered.filter((prof) => {
         const availableSeats =
           prof.limits.minor_project - prof.currentCount.minor_project;
-        return filterOption === "available"
-          ? availableSeats > 0
-          : availableSeats === 0;
+        return availableSeats > 0;
+      });
+    } else if (filterOption === "applied") {
+      filtered = filtered.filter((prof) => appliedProfessors.includes(prof._id));
+      // Sort by preference order
+      filtered.sort((a, b) => {
+        const prefA = appliedProfessors.indexOf(a._id);
+        const prefB = appliedProfessors.indexOf(b._id);
+        return prefA - prefB;
       });
     }
 
@@ -163,7 +169,7 @@ const MinorProject = () => {
   // Call this function whenever the search query or filter option changes
   useEffect(() => {
     handleSearchAndFilter();
-  }, [searchQuery, filterOption, professors]);
+  }, [searchQuery, filterOption, professors, appliedProfessors]);
 
   return (
     <>
