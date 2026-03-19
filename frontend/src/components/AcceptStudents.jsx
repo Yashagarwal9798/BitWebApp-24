@@ -318,6 +318,17 @@ const AcceptStudents = () => {
                     className={`p-4 flex items-center justify-between ${selectedGroup === group._id ? "bg-blue-50" : "bg-white"} hover:bg-gray-50 cursor-pointer`}
                   >
                     <div className="flex items-center space-x-4">
+                      {viewMode === "accepted" && (
+                        <input
+                          type="checkbox"
+                          checked={selectedAcceptedGroups.includes(group._id)}
+                          onChange={(e) => {
+                            e.stopPropagation();
+                            handleSelectAcceptedGroup(group._id);
+                          }}
+                          className="h-5 w-5 text-blue-600 rounded focus:ring-blue-500 cursor-pointer"
+                        />
+                      )}
                       {viewMode === "accepted" && group.projectTitle && (
                         <div className="hidden md:flex flex-col mr-4">
                           <span className="text-xs text-gray-500 font-medium uppercase tracking-wider">Project Title</span>
