@@ -244,7 +244,23 @@ const addProf = asyncHandler(async (req, res) => {
 // });
 
 const getProf = asyncHandler(async (req, res) => {
-  const professors = await Professor.find().select("-password");
+  const { batch } = req.query;
+
+  let professors;
+  if (batch) {
+    const batchUsers = await User.find({ batch }).select("_id");
+    const batchUserIds = batchUsers.map((u) => u._id);
+    const batchGroups = await Group.find({
+      members: { $in: batchUserIds },
+    }).select("_id");
+    const batchGroupIds = batchGroups.map((g) => g._id);
+    professors = await Professor.find({
+      "students.summer_training": { $in: batchGroupIds },
+    }).select("-password");
+  } else {
+    professors = await Professor.find().select("-password");
+  }
+
   res
     .status(200)
     .json(
